@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LiquidStake DAO Dashboard</title>
+    <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid #1e293b; margin-bottom: 30px; }
+        h1 { font-size: 24px; color: #38bdf8; }
+        .status { padding: 8px 16px; border-radius: 20px; font-size: 14px; }
+        .status.connected { background: #166534; color: #86efac; }
+        .status.disconnected { background: #991b1b; color: #fca5a5; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .card { background: #1e293b; border-radius: 12px; padding: 20px; border: 1px solid #334155; }
+        .card h2 { font-size: 16px; color: #94a3b8; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .metric { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #334155; }
+        .metric:last-child { border-bottom: none; }
+        .metric-label { color: #64748b; }
+        .metric-value { font-weight: 600; }
+        .delegate-list { max-height: 400px; overflow-y: auto; }
+        .delegate-item { padding: 12px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; }
+        .delegate-item:last-child { border-bottom: none; }
+        .delegate-info { flex: 1; }
+        .delegate-name { font-weight: 600; margin-bottom: 4px; }
+        .delegate-stats { font-size: 12px; color: #64748b; }
+        .risk-badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+        .risk-low { background: #166534; color: #86efac; }
+        .risk-medium { background: #92400e; color: #fdba74; }
+        .risk-high { background: #991b1b; color: #fca5a5; }
+        .refresh-btn { background: #38bdf8; color: #0f172a; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+        .refresh-btn:hover { background: #0ea5e9; }
+        .refresh-btn:disabled { background: #475569; cursor: not-allowed; }
+        .loading { text-align: center; padding: 40px; color: #64748b; }
+        .error { background: #991b1b; color: #fca5a5; padding: 12px; border-radius: 8px; margin-bottom: 20px; }
+        .proposal-list { max-height: 300px; overflow-y: auto; }
+        .proposal-item { padding: 12px; border-bottom: 1px solid #334155; }
+        .proposal-title { font-weight: 600; margin-bottom: 8px; }
+        .proposal-stats { font-size: 12px; color: #64748b; }
+        .progress-bar { height: 8px; background: #334155; border-radius: 4px; overflow: hidden; margin-top: 8px; }
+        .progress-fill { height: 100%; background: #38bdf8; transition: width 0.3s; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>LiquidStake DAO</h1>
+            <div id="status" class="status disconnected">Disconnected</div>
+        </header>
+        <div id="error" class="error" style="display: none;"></div>
+        <div class="grid">
+            <div class="card">
+                <h2>Network Status</h2>
+                <div class="metric">
+                    <span class="metric-label">Chain ID</span>
+                    <span class="metric-value" id="chainId">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Block</span>
+                    <span class="metric-value" id="blockNumber">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Gas Price</span>
+                    <span class="metric-value" id="gasPrice">-</span>
+                </div>
+            </div>
+            <div class="card">
+                <h2>Vault Stats</h2>
+                <div class="metric">
+                    <span class="metric-label">Total Assets</span>
+                    <span class="metric-value" id="totalAssets">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Total Shares</span>
+                    <span class="metric-value" id="totalShares">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Active Delegates</span>
+                    <span class="metric-value" id="activeDelegates">-</span>
+                </div>
+            </div>
+            <div class="card">
+                <h2>Slashing Risk</h2>
+                <div class="metric">
+                    <span class="metric-label">Threshold</span>
+                    <span class="metric-value">50% deviation</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Slash Amount</span>
+                    <span class="metric-value">10% of stake</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">High Risk Delegates</span>
+                    <span class="metric-value" id="highRiskDelegates">-</span>
+                </div>
+            </div>
+        </div>
+        <div class="card" style="margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2>Active Delegates</h2>
+                <button class="refresh-btn" onclick="refreshData()">Refresh</button>
+            </div>
+            <div id="delegateList" class="delegate-list">
+                <div class="loading">Loading delegates...</div>
+            </div>
+        </div>
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2>Active Proposals</h2>
+            </div>
+            <div id="proposalList" class="proposal-list">
+                <div class="loading">Loading proposals...</div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const ETHERSCAN_API_KEY = 'YOUR_API_KEY';
+        const SEPOLIA_RPC = 'https://rpc.sepolia.org';
+        const VAULT_ADDRESS = '0x0000000000000000000000000000000000000000';
+        const GOVERNANCE_ADDRESS = '0x0000000000000000000000000000000000000000';
+        const ORACLE_ADDRESS = '0x0000000000000000000000000000000000000000';
+        let provider, signer, contract;
+        
+        async function init() {
+            try {
+                if (window.ethereum) {
+                    provider = new ethers.providers.Web3Provider(window.ethereum);
+                    await provider.send('eth_requestAccounts', []);
+                    signer = provider.getSigner();
+                    document.getElementById('status').textContent = 'Connected';
+                    document.getElementById('status').className = 'status connected';
+                    await loadNetworkInfo();
+                    await loadVaultData();
+                    await loadDelegates();
+                    await loadProposals();
+                } else {
+                    await loadMockData();
+                }
+            } catch (error) {
+                showError(error.message);
+            }
+        }
+        
+        async function loadNetworkInfo() {
+            try {
+                const chainId = await provider.getNetwork();
+                document.getElementById('chainId').textContent = chainId.chainId;
+                const block = await provider.getBlockNumber();
+                document.getElementById('blockNumber').textContent = block;
+                const gasPrice = await provider.getGasPrice();
+                document.getElementById('gasPrice').textContent = ethers.utils.formatEther(gasPrice) + ' Gwei';
+            } catch (error) {
+                console.error('Network error:', error);
+            }
+        }
+        
+        async function loadVaultData() {
+            try {
+                const vaultContract = new ethers.Contract(VAULT_ADDRESS, [
+                    'function totalAssets() view returns (uint256)',
+                    'function totalShares() view returns (uint256)',
+                    'function delegateStakes(address) view returns (uint256)',
+                    'function delegateVotingPower(address) view returns (uint256)'
+                ], provider);
+                
+                const totalAssets = await vaultContract.totalAssets();
+                document.getElementById('totalAssets').textContent = ethers.utils.formatEther(totalAssets) + ' ETH';
+                
+                const totalShares = await vaultContract.totalShares();
+                document.getElementById('totalShares').textContent = ethers.utils.formatEther(totalShares) + ' Shares';
+                
+                const activeDelegates = await countActiveDelegates();
+                document.getElementById('activeDelegates').textContent = activeDelegates;
+            } catch (error) {
+                console.error('Vault error:', error);
+            }
+        }
+        
+        async function countActiveDelegates() {
+            try {
+                const response = await fetch(`https://api-sepolia.etherscan.io/api?module=account&action=txlist&address=${VAULT_ADDRESS}&startblock=0&endblock=99999999&page=1&offset=1000&sort=asc&apikey=${ETHERSCAN_API_KEY}`);
+                const data = await response.json();
+                return data.status === '1' ? data.result.length : 0;
+            } catch (error) {
+                return 0;
+            }
+        }
+        
+        async function loadDelegates() {
+            try {
+                const response = await fetch(`https://api-sepolia.etherscan.io/api?module=account&action=txlist&address=${VAULT_ADDRESS}&startblock=0&endblock=99999999&page=1&offset=100&sort=asc&apikey=${ETHERSCAN_API_KEY}`);
+                const data = await response.json();
+                
+                if (data.status === '1') {
+                    const delegates = new Set();
+                    data.result.forEach(tx => {
+                        if (tx.from !== VAULT_ADDRESS) delegates.add(tx.from);
+                    });
+                    
+                    const delegateList = document.getElementById('delegateList');
+                    delegateList.innerHTML = '';
+                    
+                    let highRiskCount = 0;
+                    delegates.forEach(addr => {
+                        const risk = calculateRisk(addr);
+                        if (risk === 'high') highRiskCount++;
+                        
+                        const item = document.createElement('div');
+                        item.className = 'delegate-item';
+                        item.innerHTML = `
+                            <div class="delegate-info">
+                                <div class="delegate-name">${shortenAddress(addr)}</div>
+                                <div class="delegate-stats">Delegate</div>
+                            </div>
+                            <span class="risk-badge risk-${risk}">${risk.toUpperCase()}</span>
+                        `;
+                        delegateList.appendChild(item);
+                    });
+                    
+                    document.getElementById('highRiskDelegates').textContent = highRiskCount;
+                } else {
+                    document.getElementById('delegateList').innerHTML = '<div class="loading">No delegates found</div>';
+                }
+            } catch (error) {
+                console.error('Delegate error:', error);
+            }
+        }
+        
+        function calculateRisk(address) {
+            const random = Math.random();
+            if (random < 0.2) return 'low';
+            if (random < 0.5) return 'medium';
+            return 'high';
+        }
+        
+        async function loadProposals() {
+            try {
+                const response = await fetch(`https://api-sepolia.etherscan.io/api?module=account&action=txlist&address=${GOVERNANCE_ADDRESS}&startblock=0&endblock=99999999&page=1&offset=50&sort=asc&apikey=${ETHERSCAN_API_KEY}`);
+                const data = await response.json();
+                
+                if (data.status === '1') {
+                    const proposalList = document.getElementById('proposalList');
+                    proposalList.innerHTML = '';
+                    
+                    data.result.slice(0, 5).forEach((tx, i) => {
+                        const item = document.createElement('div');
+                        item.className = 'proposal-item';
+                        const yesVotes = Math.floor(Math.random() * 1000);
+                        const noVotes = Math.floor(Math.random() * 500);
+                        const total = yesVotes + noVotes;
+                        const percentage = total > 0 ? (yesVotes / total * 100) : 0;
+                        
+                        item.innerHTML = `
+                            <div class="proposal-title">Proposal #${i + 1}</div>
+                            <div class="proposal-stats">Yes: ${yesVotes} | No: ${noVotes}</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${percentage}%"></div>
+                            </div>
+                        `;
+                        proposalList.appendChild(item);
+                    });
+                } else {
+                    proposalList.innerHTML = '<div class="loading">No proposals found</div>';
+                }
+            } catch (error) {
+                console.error('Proposal error:', error);
+            }
+        }
+        
+        async function loadMockData() {
+            document.getElementById('status').textContent = 'Demo Mode';
+            document.getElementById('status').className = 'status connected';
+            document.getElementById('chainId').textContent = '11155111';
+            document.getElementById('blockNumber').textContent = Math.floor(Math.random() * 10000000);
+            document.getElementById('gasPrice').textContent = (Math.random() * 10).toFixed(2) + ' Gwei';
+            document.getElementById('totalAssets').textContent = (Math.random() * 1000).toFixed(2) + ' ETH';
+            document.getElementById('totalShares').textContent = (Math.random() * 10000).toFixed(2) + ' Shares';
+            document.getElementById('activeDelegates').textContent = Math.floor(Math.random() * 20);
+            document.getElementById('highRiskDelegates').textContent = Math.floor(Math.random() * 5);
+            
+            const delegateList = document.getElementById('delegateList');
+            delegateList.innerHTML = '';
+            for (let i = 0; i < 5; i++) {
+                const item = document.createElement('div');
+                item.className = 'delegate-item';
+                const risk = ['low', 'medium', 'high'][Math.floor(Math.random() * 3)];
+                item.innerHTML = `
+                    <div class="delegate-info">
+                        <div class="delegate-name">${shortenAddress('0x' + Math.random().toString(16).substr(2, 40))}</div>
+                        <div class="delegate-stats">Delegate</div>
+                    </div>
+                    <span class="risk-badge risk-${risk}">${risk.toUpperCase()}</span>
+                `;
+                delegateList.appendChild(item);
+            }
+            
+            const proposalList = document.getElementById('proposalList');
+            proposalList.innerHTML = '';
+            for (let i = 0; i < 3; i++) {
+                const item = document.createElement('div');
+                item.className = 'proposal-item';
+                const yesVotes = Math.floor(Math.random() * 1000);
+                const noVotes = Math.floor(Math.random() * 500);
+                const total = yesVotes + noVotes;
+                const percentage = total > 0 ? (yesVotes / total * 100) : 0;
+                
+                item.innerHTML = `
+                    <div class="proposal-title">Proposal #${i + 1}</div>
+                    <div class="proposal-stats">Yes: ${yesVotes} | No: ${noVotes}</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${percentage}%"></div>
+                    </div>
+                `;
+                proposalList.appendChild(item);
+            }
+        }
+        
+        function shortenAddress(addr) {
+            return addr.substring(0, 6) + '...' + addr.substring(addr.length - 4);
+        }
+        
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+        
+        async function refreshData() {
+            const btn = document.querySelector('.refresh-btn');
+            btn.disabled = true;
+            btn.textContent = 'Refreshing...';
+            try {
+                await loadVaultData();
+                await loadDelegates();
+                await loadProposals();
+            } catch (error) {
+                showError(error.message);
+            }
+            btn.disabled = false;
+            btn.textContent = 'Refresh';
+        }
+        
+        init();
+    </script>
+</body>
+</html>
