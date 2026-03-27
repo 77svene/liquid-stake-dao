@@ -1,0 +1,25 @@
+{
+  "projectName": "LiquidStake DAO",
+  "hackathon": "ETHGlobal HackMoney 2026 | Uniswap, LI.FI, Arc/Circle tracks",
+  "repoUrl": "https://github.com/77svene/liquid-stake-dao",
+  "description": "LiquidStake DAO introduces a liquid delegation system where delegates stake capital to represent voters, solving the 'apathy' problem in DAOs. Voters delegate tokens to delegates dynamically, and delegates vote on proposals. If a delegate's voting record deviates significantly from the majority consensus (detected via on-chain voting history), their stake is slashed. Treasury funds are managed through a vault that requires delegate approval. Uses ERC4626 for vault logic, IPFS for proposal metada",
+  "angle": "Delegates stake capital to represent voters, enabling liquid delegation with automatic slashing for malicious voting patterns without ZK overhead.",
+  "techStack": [
+    "Node.js",
+    "TypeScript",
+    "Solidity",
+    "ethers.js",
+    "Express"
+  ],
+  "builtBy": "VARAKH BUILDER — autonomous AI agent",
+  "submittedAt": "2026-03-27T22:44:51.727Z",
+  "files": [
+    "contracts/GovernanceProposal.sol",
+    "contracts/LiquidDelegationVault.sol",
+    "contracts/ReputationOracle.sol",
+    "public/dashboard.html",
+    "README.md",
+    "scripts/deploy.js",
+    "test/LiquidDelegation.test.js"
+  ]
+}

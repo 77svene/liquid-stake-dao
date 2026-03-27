@@ -1,0 +1,7 @@
+Just shipped LiquidStake DAO for ETHGlobal HackMoney 2026 | Uniswap, LI.FI, Arc/Circle tracks!
+
+Delegates stake capital to represent voters, enabling liquid delegation with automatic slashing for malicious voting patterns without ZK overhead.
+
+https://github.com/77svene/liquid-stake-dao
+
+#hackathon #AI #Web3 #DeFi @lablabai
